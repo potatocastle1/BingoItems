@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3D Model Viewer</title>
+
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+      font-family: Arial, sans-serif;
+    }
+
+    #layers {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      z-index: 10;
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      max-height: 80vh;
+      overflow-y: auto;
+    }
+
+    #layers h3 {
+      margin-top: 0;
+    }
+
+    #layers label {
+      display: block;
+      margin: 7px 0;
+    }
+
+    canvas {
+      display: block;
+    }
+  </style>
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://cdn.jsdelivr.net/npm/three@0.180.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.180.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+
+<body>
+
+<div id="layers">
+  <h3>Layers</h3>
+</div>
+
+<script type="module">
+
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xeeeeee);
+
+const camera = new THREE.PerspectiveCamera(
+  50,
+  window.innerWidth / window.innerHeight,
+  0.1,
+  10000
+);
+
+camera.position.set(5, 5, 5);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+
+/* Lighting */
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 3));
+
+const light = new THREE.DirectionalLight(0xffffff, 3);
+light.position.set(5, 10, 5);
+scene.add(light);
+
+/* Load Blender model */
+
+const loader = new GLTFLoader();
+
+loader.load(
+  "./model.glb",
+
+  (gltf) => {
+
+    const model = gltf.scene;
+    scene.add(model);
+
+    /* Automatically create layer switches */
+
+    const panel = document.getElementById("layers");
+
+    model.children.forEach((group) => {
+
+      const label = document.createElement("label");
+
+      const checkbox = document.createElement("input");
+      checkbox.type = "checkbox";
+      checkbox.checked = true;
+
+      checkbox.addEventListener("change", () => {
+        group.visible = checkbox.checked;
+      });
+
+      label.appendChild(checkbox);
+      label.append(" " + (group.name || "Unnamed Layer"));
+
+      panel.appendChild(label);
+
+    });
+
+    /* Automatically frame model */
+
+    const box = new THREE.Box3().setFromObject(model);
+    const size = box.getSize(new THREE.Vector3()).length();
+    const center = box.getCenter(new THREE.Vector3());
+
+    controls.target.copy(center);
+
+    camera.position.copy(center);
+    camera.position.x += size * 0.6;
+    camera.position.y += size * 0.4;
+    camera.position.z += size * 0.6;
+
+    camera.near = size / 100;
+    camera.far = size * 100;
+    camera.updateProjectionMatrix();
+
+    controls.update();
+  },
+
+  undefined,
+
+  (error) => {
+    console.error("Could not load model:", error);
+  }
+);
+
+/* Resize */
+
+window.addEventListener("resize", () => {
+
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+});
+
+/* Render */
+
+function animate() {
+
+  controls.update();
+  renderer.render(scene, camera);
+
+}
+
+renderer.setAnimationLoop(animate);
+
+</script>
+
+</body>
+</html>
